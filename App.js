@@ -13,13 +13,15 @@ import {
   Alert,
   Image,
   View,
-  Navigator
+  Navigator,
+  AsyncStorage
 } from 'react-native';
 
 import List from './app/creation/index'
 import Edit from './app/edit/index'
 import Account from './app/account/index'
 import Detail from './app/creation/detail'
+import Login from './app/account/login'
 
 import TabNavigator from 'react-native-tab-navigator';
 import Icon from 'react-native-vector-icons/FontAwesome';
@@ -48,17 +50,35 @@ const ListNavigation = StackNavigator({
 const tabItemSelectedIconSize = px2dp(16)
 const tabItemSelectedIconBg = '#108ee9'
 
-export default class App extends Component<{}> {
+export default class App extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      selectedTab: 'camera'
+      selectedTab: 'camera',
+      hasLogin: false
     }
   }
 
+  loginSuccess = (user) => {
+    var userJson = JSON.stringify(user);
+    var me = this
+    AsyncStorage
+      .setItem('user', userJson)
+      .then(x => {
+        me.setState({hasLogin: true})
+      })
+  }
+
+  logout = () => {
+    AsyncStorage.removeItem('user')
+    this.setState({hasLogin: false})
+  }
+
   render() {
-    return (
-      <TabNavigator style={styles.container}>
+    return ( //!this.state.hasLogin
+        false
+      ? <Login loginSuccess={this.loginSuccess}></Login>
+      : <TabNavigator style={styles.container}>
         <TabNavigator.Item
           selected={this.state.selectedTab === 'camera'}
           title="camera"
@@ -95,8 +115,7 @@ export default class App extends Component<{}> {
           onPress={() => this.setState({selectedTab: 'bars'})}>
           <Account/>
         </TabNavigator.Item>
-      </TabNavigator>
-    );
+      </TabNavigator>);
   }
 }
 

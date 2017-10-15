@@ -13,7 +13,7 @@ import {
     Image,
     View,
     ListView,
-    TouchableHighlight,
+    TouchableOpacity,
     ActivityIndicator,
     RefreshControl
 } from 'react-native';
@@ -65,7 +65,6 @@ class Item extends Component {
                 Alert.alert('操作失败，请稍后再试')
             }
         }).catch(x => {
-            console.error(x)
             Alert.alert('操作失败，请稍后再试')
         })
     }
@@ -79,7 +78,7 @@ class Item extends Component {
     render() {
         var row = this.state.row
         return (
-            <TouchableHighlight onPress={this._onForward}>
+            <TouchableOpacity onPress={this._onForward} underlayColor={'#ddd'}>
                 <View style={styles.item}>
                     <Text style={styles.title}>{row.title}</Text>
                     <Image
@@ -110,7 +109,7 @@ class Item extends Component {
                         </View>
                     </View>
                 </View>
-            </TouchableHighlight>
+            </TouchableOpacity>
         );
     }
 }
@@ -175,7 +174,6 @@ export default class Creation extends Component {
                 }
             }, 20);
         }).catch((error) => {
-            console.error(error);
         });
     }
 

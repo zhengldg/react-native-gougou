@@ -6,20 +6,44 @@ import {
     StyleSheet,
     TouchableOpacity,
     ScrollView,
-    Image
+    ListView,
+    Image,
+    TextInput,
+    ActivityIndicator,
+    Modal,
+    Alert
 } from 'react-native';
 import Video from 'react-native-video';
 import {Dimensions} from 'react-native'
 import Icon from 'react-native-vector-icons/FontAwesome';
+import {get, post} from '../common/request'
+import Button from 'react-native-button'
 
 const width = Dimensions
     .get('window')
     .width
 
+const ds = new ListView.DataSource({
+    rowHasChanged: (r1, r2) => r1 !== r2
+});
+
+const cacheResults = {
+    items: [],
+    total: 0,
+    nextPage: 1
+}
+
+var hasMore = function () {
+    return cacheResults.items.length < cacheResults.total;
+};
+
 class Detail extends Component {
     constructor(props) {
         super(props)
         this.state = {
+            dataSource: ds.cloneWithRows([]),
+            isLoading: false,
+            modalVisible: false,
             rate: 1,
             volume: 1,
             muted: false,
@@ -30,8 +54,8 @@ class Detail extends Component {
         };
     }
 
-    componentWillMount() {
-        console.log(this.props.navigation.state.params.id)
+    componentDidMount() {
+        this._fetchCommentsData()
     }
 
     _back = () => {
@@ -39,10 +63,117 @@ class Detail extends Component {
         goBack(null)
     }
 
+    _fetchCommentsData() {
+        this.setState({isLoading: true})
+        var videoId = this.props.navigation.state.params.id.id
+        get('comments', {
+            accessToken: 'test',
+            videoId: videoId
+        }).then((rs) => {
+            if (rs.success) {
+                var items = cacheResults
+                    .items
+                    .slice();
+                items = items.concat(rs.data)
+                cacheResults.total = rs.total
+                cacheResults.nextPage++;
+                cacheResults.items = items;
+                this.setState({
+                    dataSource: ds.cloneWithRows(items),
+                    isLoading: false
+                })
+            }
+        }).catch((e) => {})
+    }
+
     _togglePause = () => {
         this.setState({
             paused: !this.state.paused
         })
+    }
+
+    _fetchMoreData() {
+        if (!hasMore()) {
+            return;
+        }
+        var page = cacheResults.nextPage;
+        this._fetchCommentsData(page);
+    }
+
+    renderFooter() {
+        if (!hasMore() && cacheResults.total != 0) {
+            return (
+                <View style={styles.loadingMore}>
+                    <Text style={styles.loadingText}>没有更多了</Text>
+                </View>
+            )
+        } else {
+            return (<ActivityIndicator style={styles.loadingMore} size="large"/>);
+        }
+    }
+
+    _focus = () => {
+        this._setModalVisible(true)
+    }
+
+    _setModalVisible(visible) {
+        this.setState({modalVisible: visible})
+    }
+
+    _blur = () => {}
+
+    _closeModel = () => {
+        this._setModalVisible(false)
+    }
+
+    renderHeader = () => {
+        const data = this.props.navigation.state.params.id
+        return <View style={styles.listHeader}>
+            <View style={styles.infoBox}>
+                <Image
+                    style={styles.avatar}
+                    source={{
+                    uri: data.author.avatar
+                }}></Image>
+                <View style={styles.descBox}>
+                    <Text style={styles.nickname}>{data.author.nickname}</Text>
+                    <Text style={styles.title}>{data.title}</Text>
+                </View>
+            </View>
+            <View style={styles.commentBox}>
+                <View style={styles.comment}>
+                    <Text>敢不敢评论一个</Text>
+                    <TextInput
+                        placeholder="好喜欢这个视频啊..."
+                        style={styles.content}
+                        multiline={true}
+                        onFocus={this._focus}></TextInput>
+                </View>
+            </View>
+            <View style={styles.commentArea}>
+                <Text >精彩评论</Text>
+            </View>
+        </View>
+    }
+
+    _renderRow(row) {
+        return <View key={row.id} style={styles.replyBox}>
+            <Image
+                style={styles.replyAvatar}
+                source={{
+                uri: row.replyBy.avatar
+            }}></Image>
+            <View style={styles.reply}>
+                <Text style={styles.replyNickname}>{row.replyBy.nickname}</Text>
+                <Text style={styles.replyContent}>{row.content}</Text>
+            </View>
+        </View>
+    }
+
+    _submit = () => {
+        if (!this.state.content) {
+            Alert.alert("评论内容不能为空");
+        }
     }
 
     render() {
@@ -56,7 +187,7 @@ class Detail extends Component {
                     <Video
                         style={styles.video}
                         source={{
-                        uri: 'http://42.236.62.25/youku/67657F08983E839D099DB55E6/03000A010059A7F546498838C66A995332ECF8-92DE-6160-0AE6-DA3DFD6674AA.mp4?sid=050764542549512852515&ctype=12&ccode=0512&duration=149&expire=18000&psid=3a3918c3234d9afb91674e28d6678be3&ups_client_netip=27.38.56.21&ups_ts=1507645425&ups_userid=&utid=5ckyErpaPCsCARsmOB4Ircsw&vkey=Acd1b02834d9a9c2c74cbec1335cf8feb&vid=XMzAwMDIzMDQxMg%3D%3D'
+                        uri: 'http://clips.vorwaerts-gmbh.de/big_buck_bunny.mp4'
                     }}
                         rate={this.state.rate}
                         paused={this.state.paused}
@@ -70,23 +201,42 @@ class Detail extends Component {
                     </TouchableOpacity>
                 </View>
 
-                <ScrollView
+                <ListView
+                    renderHeader={this.renderHeader}
+                    dataSource={this.state.dataSource}
+                    renderRow={this._renderRow}
                     automaticallyAdjustContentInsets={false}
                     showsVerticalScrollIndicator={false}
                     enableEmptySections={true}
-                    style={styles.scrollView}>
-                    <View style={styles.infoBox}>
-                        <Image
-                            style={styles.avatar}
-                            source={{
-                            uri: data.author.avatar
-                        }}></Image>
-                        <View style={styles.descBox}>
-                            <Text style={styles.nickname}>{data.author.nickname}</Text>
-                            <Text style={styles.title}>{data.title}</Text>
+                    renderFooter={this.renderFooter}
+                    onEndReached={() => this._fetchMoreData()}
+                    onEndReachedThreshold={20}
+                    style={styles.listview}></ListView>
+                <Modal
+                    animationType={"fade"}
+                    visible={this.state.modalVisible}
+                    onRequestClose={() => {
+                    this._setModalVisible(false)
+                }}>
+                    <View style={styles.modalContainer}>
+                        <Icon onPress={this._closeModel} name='close' style={styles.closeIcon}></Icon>
+                        <View style={styles.commentBox}>
+                            <View style={styles.comment}>
+                                <Text>敢不敢评论一个</Text>
+                                <TextInput
+                                    placeholder="好喜欢这个视频啊..."
+                                    style={styles.content}
+                                    multiline={true}
+                                    defaultValue
+                                    ={this.state.content}
+                                    onChangeText={(text) => {
+                                    this.setState({content: text})
+                                }}></TextInput>
+                            </View>
                         </View>
+                        <Button style={styles.submitBtn} onPress={this._submit}>评论</Button>
                     </View>
-                </ScrollView>
+                </Modal>
             </View>
         );
     }
@@ -94,6 +244,85 @@ class Detail extends Component {
 
 // define your styles
 const styles = StyleSheet.create({
+    submitBtn: {
+        alignSelf:'center',
+        width: width - 20,
+        padding: 16,
+        marginTop: 20,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: '#ee753c',
+        borderRadius: 4,
+        color: '#ee753c',
+        fontSize: 18
+    },
+    modalContainer: {
+        flex: 1,
+        paddingTop: 45,
+        backgroundColor: '#fff'
+    },
+    closeIcon: {
+        alignSelf: 'center',
+        fontSize: 30,
+        color: '#ee753c'
+    },
+
+    commentArea: {
+        width: width,
+        marginTop: 8,
+        paddingBottom: 6,
+        paddingLeft: 10,
+        paddingRight: 19,
+        borderBottomWidth: 1,
+        borderBottomColor: '#eee'
+    },
+    commentBox: {
+        marginVertical: 10,
+        padding: 8,
+        width: width
+    },
+    content: {
+        paddingLeft: 2,
+        color: '#333',
+        borderWidth: 1,
+        borderColor: '#ddd',
+        borderRadius: 4,
+        fontSize: 14,
+        height: 80
+    },
+    listHeader: {
+        width: width,
+        marginTop: 10
+    },
+
+    listview: {
+        width: width,
+        marginTop: 5
+    },
+    replyBox: {
+        width: width,
+        flexDirection: 'row',
+        justifyContent: 'flex-start',
+        marginTop: 10
+    },
+    replyAvatar: {
+        width: 40,
+        height: 40,
+        marginRight: 10,
+        marginLeft: 10,
+        borderRadius: 20
+    },
+    replyNickname: {
+        color: '#666'
+    },
+    replyContent: {
+        color: '#666',
+        marginTop: 4
+    },
+    reply: {
+        flex: 1
+    },
+
     infoBox: {
         width: width,
         flexDirection: 'row',
@@ -108,7 +337,7 @@ const styles = StyleSheet.create({
         borderRadius: 30
     },
     descBox: {
-        flex: 1, //子元素平均分配空间
+        flex: 1, //子元素平均分配空间,
     },
     nickname: {
         fontSize: 18
@@ -144,13 +373,13 @@ const styles = StyleSheet.create({
 
     videoBox: {
         width: width,
-        height: 360,
+        height: 300,
         backgroundColor: '#000'
     },
 
     video: {
         width: width,
-        height: 360,
+        height: 300,
         backgroundColor: '#000'
     },
     header: {
@@ -166,6 +395,12 @@ const styles = StyleSheet.create({
     },
     container: {
         flex: 1
+    },
+    loadingMore: {
+        marginVertical: 20
+    },
+    loadingText: {
+        textAlign: 'center'
     }
 });
 
